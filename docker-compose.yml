@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: filmy-ai-api
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=False
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite:///./data/filmy_ai.db
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./models:/app/models
+    depends_on:
+      - redis
+    networks:
+      - filmy-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: filmy-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - filmy-network
+    restart: unless-stopped
+
+  celery:
+    build: .
+    container_name: filmy-ai-celery
+    command: celery -A app.tasks worker --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    networks:
+      - filmy-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  filmy-network:
+    driver: bridge
