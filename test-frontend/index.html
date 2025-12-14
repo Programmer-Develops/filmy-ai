@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filmy AI - AI Video Editor</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; color: #333; }
+        h1, h2 { color: #2c3e50; }
+        button { cursor: pointer; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; transition: 0.2s; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; }
+        pre { background: #eee; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input[type="file"] { margin-bottom: 10px; }
+        textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; }
+        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.9em; font-weight: bold; }
+        .status-processing { background: #fff3cd; color: #856404; }
+        .status-completed { background: #d4edda; color: #155724; }
+    </style>
+</head>
+<body>
+    <div style="text-align: center; margin-bottom: 30px;">
+        <h1>🎬 Filmy AI</h1>
+        <p>AI-Powered Video Editor powered by Gemini & MoviePy</p>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="card">
+        <h2>1. Upload Video</h2>
+        <input type="file" id="videoFile" accept="video/*"/>
+        <button id="uploadBtn">Upload Video</button>
+        <div id="uploadStatus" style="margin-top: 10px;"></div>
+    </div>
+
+    <!-- AI Editing Section -->
+    <div class="card" id="aiSection" style="display:none; opacity: 0.5; pointer-events: none;">
+        <h2>2. AI Instruction</h2>
+        <p>Tell the AI how to edit your video (e.g., <em>"Remove background noise, cut the first 3 seconds, and make it black and white."</em>)</p>
+        
+        <textarea id="instructionText" rows="3" placeholder="Enter instructions here..."></textarea>
+        
+        <div style="margin-top: 10px;">
+            <button id="submitInstructionBtn">✨ Apply AI Edits</button>
+        </div>
+
+        <div id="aiFeedback" style="margin-top: 15px;"></div>
+    </div>
+
+    <!-- Preview Section -->
+    <div class="card" id="resultSection" style="display:none;">
+        <h2>3. Result</h2>
+        <div id="videoContainer"></div>
+        <div style="margin-top: 10px;">
+            <a id="downloadLink" href="#" style="text-decoration: none;">
+                <button style="background: #28a745;">Download Processed Video</button>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = 'http://localhost:8000/'; 
+        let currentVideoId = null;
+
+        // 1. Upload Logic
+        document.getElementById('uploadBtn').onclick = async () => {
+            const input = document.getElementById('videoFile');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!input.files.length) return alert('Please select a file first');
+            
+            statusDiv.innerHTML = '⏳ Uploading...';
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+
+            try {
+                const r = await fetch(apiBase + 'api/v1/upload/video', { method: 'POST', body: fd });
+                const json = await r.json();
+                
+                if (json.video_id || json.filename) {
+                    // Adapt to whichever key your API returns
+                    currentVideoId = json.video_id || json.filename;
+                    statusDiv.innerHTML = `✅ Upload Complete! ID: <code>${currentVideoId}</code>`;
+                    
+                    // Enable AI Section
+                    const aiSec = document.getElementById('aiSection');
+                    aiSec.style.display = 'block';
+                    aiSec.style.opacity = '1';
+                    aiSec.style.pointerEvents = 'auto';
+                } else {
+                    throw new Error('Invalid response from server');
+                }
+            } catch(err) {
+                statusDiv.innerHTML = `❌ Upload failed: ${err.message}`;
+            }
+        };
+
+        // 2. AI Instruction Logic
+        document.getElementById('submitInstructionBtn').onclick = async () => {
+            const text = document.getElementById('instructionText').value.trim();
+            const feedback = document.getElementById('aiFeedback');
+            
+            if (!text) return alert('Please enter an instruction');
+            
+            feedback.innerHTML = '<span class="status-badge status-processing">⚙️ AI is processing... (This may take a minute)</span>';
+            
+            try {
+                // Ensure this endpoint matches your routes.py
+                const r = await fetch(apiBase + 'api/v1/instruct', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ video_id: currentVideoId, instruction: text })
+                });
+                
+                const json = await r.json();
+                
+                if (json.status === 'success' || json.output_path) {
+                    feedback.innerHTML = `✅ <strong>Success!</strong> AI executed: <pre>${JSON.stringify(json.operations || json.ai_interpretation, null, 2)}</pre>`;
+                    
+                    // Show Result
+                    showPreview(json.output_path);
+                } else {
+                    feedback.innerHTML = `❌ Error: ${json.message || 'Unknown error'}`;
+                }
+            } catch(err) {
+                feedback.innerHTML = `❌ Request failed: ${err.message}`;
+            }
+        };
+
+        function showPreview(serverPath) {
+            const resultSec = document.getElementById('resultSection');
+            const container = document.getElementById('videoContainer');
+            const dlLink = document.getElementById('downloadLink');
+
+            // Extract filename from path to construct download URL
+            // Assumes path is like '.../output_videos/filename.mp4'
+            const filename = serverPath.split(/[\\/]/).pop();
+            const dlUrl = apiBase + 'api/v1/download/' + encodeURIComponent(filename);
+
+            container.innerHTML = `
+                <video controls width="100%" style="border-radius: 8px; background: black;">
+                    <source src="${dlUrl}" type="video/mp4">
+                    Your browser does not support video tag.
+                </video>
+            `;
+            
+            dlLink.href = dlUrl;
+            dlLink.download = filename;
+            resultSec.style.display = 'block';
+            
+            // Auto scroll to result
+            resultSec.scrollIntoView({ behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
