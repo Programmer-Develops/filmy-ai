@@ -1,10 +1,13 @@
 """API route definitions"""
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, BackgroundTasks, WebSocket
 from fastapi.responses import FileResponse
 import os
+import asyncio
 from ..services.video_service import VideoService
 from ..models.schemas import VideoProcessRequest, VideoEnhancementRequest, EnhancementType
+from ..models.schemas import InstructionRequest, InstructionResponse
+from ..services.instruction_service import interpret_and_enqueue, parse_instruction
 from ..config import get_settings
 
 router = APIRouter(prefix="/api/v1", tags=["video-operations"])
@@ -147,3 +150,57 @@ async def get_video_status(video_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/instruct")
+async def instruct(request: InstructionRequest, background_tasks: BackgroundTasks):
+    """Accept a natural-language instruction, interpret it, and enqueue processing."""
+    try:
+        settings = get_settings()
+
+        # simple processor that runs operations synchronously using video_service
+        def _processor(video_id, operations):
+            # This runs in background thread context when scheduled by FastAPI
+            # Map simple operation types to existing video_service calls
+            for op in operations:
+                typ = op.get("type")
+                params = op.get("params", {})
+                video_path = os.path.join(settings.temp_video_dir, video_id)
+                # quick mapping
+                if typ in ("denoise", "upscale", "denoise_audio"):
+                    # call enhance_video
+                    # Note: video_service.enhance_video is async, but BackgroundTasks runs sync.
+                    import asyncio as _asyncio
+                    _asyncio.run(video_service.enhance_video(video_path, typ, params))
+                elif typ in ("stabilize", "stabilization"):
+                    import asyncio as _asyncio
+                    _asyncio.run(video_service.enhance_video(video_path, "stabilization", params))
+                else:
+                    # fallback to edit_video with a minimal operation payload
+                    import asyncio as _asyncio
+                    _asyncio.run(video_service.edit_video(video_path, [op]))
+
+        # interpret and enqueue
+        operations = parse_instruction(request.instruction)
+        background_tasks.add_task(_processor, request.video_id, operations)
+
+        return {"status": "accepted", "operations": operations}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.websocket('/ws/progress/{video_id}')
+async def ws_progress(websocket: WebSocket, video_id: str):
+    """WebSocket endpoint that streams processing status for a video id."""
+    await websocket.accept()
+    try:
+        while True:
+            status = await video_service.get_status(video_id)
+            await websocket.send_json({"video_id": video_id, "status": status})
+            if status == "completed":
+                break
+            await asyncio.sleep(1.0)
+    except Exception:
+        pass
+    finally:
+        await websocket.close()

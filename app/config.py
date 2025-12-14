@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     api_key: Optional[str] = None
+    # Gemini / Generative Language API key (read from .env or environment)
+    gemini_api_key: Optional[str] = None
 
     # Logging
     log_level: str = "INFO"
@@ -44,6 +46,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        env_file_encoding = "utf-8-sig"
 
 
 @lru_cache()

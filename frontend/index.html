@@ -26,11 +26,22 @@
     <div id="previewArea" style="margin-top:12px;"></div>
   </div>
 
+    <h2>Instruction-driven Editing (AI)</h2>
+    <div id="instructionArea" style="margin-top:8px; display:none;">
+      <textarea id="instructionText" rows="4" cols="60" placeholder="Describe edits, e.g. 'Remove background noise, stabilize, crop to 16:9 and brighten a bit.'"></textarea>
+      <div style="margin-top:6px;">
+        <button id="submitInstructionBtn">Submit Instruction</button>
+      </div>
+      <div id="instructionOps" style="margin-top:8px;"></div>
+      <div id="instructionProgress" style="margin-top:8px;color:green;"></div>
+    </div>
+
   <script>
     const apiBase = 'http://localhost:8000/'; // adjust if your API runs elsewhere
 
     let lastUploadedId = null;
     let lastOutputId = null;
+    let ws = null;
 
     document.getElementById('healthBtn').onclick = async () => {
       const r = await fetch(apiBase + 'api/v1/health');
@@ -137,6 +148,78 @@
         URL.revokeObjectURL(url);
       }catch(err){
         alert('Download error: ' + err.message);
+      }
+    }
+
+    // Instruction-driven editing
+    document.getElementById('submitInstructionBtn').onclick = async () => {
+      const instruction = document.getElementById('instructionText').value.trim();
+      if (!instruction) return alert('Enter an instruction');
+      if (!lastUploadedId) return alert('Upload a video first');
+
+      document.getElementById('instructionOps').textContent = 'Parsing instruction...';
+      try{
+        const r = await fetch(apiBase + 'api/v1/instruct', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ video_id: lastUploadedId, instruction })
+        });
+        const json = await r.json();
+        document.getElementById('instructionOps').textContent = JSON.stringify(json.operations || json, null, 2);
+
+        // Open WebSocket to receive progress
+        openProgressWebSocket(lastUploadedId);
+      }catch(err){
+        alert('Instruction submit failed: ' + err.message);
+      }
+    };
+
+    function openProgressWebSocket(videoId){
+      // Close existing ws if open
+      if (ws){ try{ ws.close(); }catch(e){} }
+      const wsHost = (apiBase.startsWith('https://') ? 'wss://' : 'ws://') + (new URL(apiBase)).host;
+      const wsUrl = wsHost + '/ws/progress/' + encodeURIComponent(videoId);
+      ws = new WebSocket(wsUrl);
+      const prog = document.getElementById('instructionProgress');
+      prog.textContent = 'Connecting...';
+      ws.onopen = () => { prog.textContent = 'Connected, awaiting progress...'; };
+      ws.onmessage = async (ev) => {
+        try{
+          const data = JSON.parse(ev.data);
+          prog.textContent = 'Status: ' + (data.status || JSON.stringify(data));
+          if (data.status === 'completed'){
+            prog.textContent = 'Processing completed.';
+            // attempt to discover output file and preview it
+            await discoverAndPreviewOutput(lastUploadedId);
+            ws.close();
+          }
+        }catch(e){
+          prog.textContent = ev.data;
+        }
+      };
+      ws.onerror = (e) => { prog.textContent = 'WebSocket error'; };
+      ws.onclose = () => { prog.textContent += ' (closed)'; };
+    }
+
+    async function discoverAndPreviewOutput(videoId){
+      try{
+        const r = await fetch(apiBase + 'api/v1/debug/outputs');
+        const json = await r.json();
+        const files = json.files || [];
+        // Prefer files that contain the original uploaded id or the operation name
+        let candidate = null;
+        for (let f of files.reverse()){
+          if (f.includes(videoId) || f.includes('enhance') || f.includes('upscale') || f.includes('edited')){ candidate = f; break; }
+        }
+        if (!candidate && files.length) candidate = files[files.length-1];
+        if (candidate){
+          lastOutputId = candidate;
+          showPreview(candidate);
+        }else{
+          alert('No output file found in output directory');
+        }
+      }catch(err){
+        alert('Could not list outputs: ' + err.message);
       }
     }
   </script>
