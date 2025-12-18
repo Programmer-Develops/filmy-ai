@@ -34,7 +34,6 @@ class VideoService:
             raise ValueError("GEMINI_API_KEY not configured.")
         
         genai.configure(api_key=gemini_api_key)
-        # Note: Ensure your model name is correct (e.g., 'gemini-1.5-flash')
         self.model = genai.GenerativeModel('gemini-2.5-flash')
 
     async def save_upload(self, file: UploadFile, temp_dir: str) -> str:
@@ -101,7 +100,6 @@ class VideoService:
         try:
             clip = VideoFileClip(video_path)
             
-            # --- VERSION AGNOSTIC TRIMMING ---
             if commands.get("trim_start") or commands.get("trim_end"):
                 s = float(commands.get("trim_start", 0))
                 e = clip.duration - float(commands.get("trim_end", 0))
@@ -111,28 +109,23 @@ class VideoService:
                 else: # MoviePy v1.x
                     clip = clip.subclip(s, e)
 
-            # --- AUDIO NOISE ---
             if commands.get("remove_noise"):
                 if clip.audio:
                     clip.audio = self._remove_audio_noise(clip.audio)
 
-            # --- COLOR EFFECTS ---
             if commands.get("grayscale"):
                 if vfx and hasattr(vfx, 'blackwhite'):
                     clip = clip.fx(vfx.blackwhite)
                 elif vfx and hasattr(vfx, 'black_white'):
                     clip = clip.fx(vfx.black_white)
                 else:
-                    # Manual fallback if vfx fails
                     clip = clip.image_transform(lambda im: np.dstack([np.dot(im[...,:3], [0.299, 0.587, 0.114])] * 3).astype('uint8'))
             
-            # --- SPEED ---
             if commands.get("speed", 1.0) != 1.0:
                 speed_val = float(commands["speed"])
                 if vfx and hasattr(vfx, 'speedx'):
                     clip = clip.fx(vfx.speedx, speed_val)
                 
-            # --- VOLUME ---
             if commands.get("volume_boost", 1.0) != 1.0:
                 boost = float(commands["volume_boost"])
                 if clip.audio:
@@ -149,7 +142,6 @@ class VideoService:
                     except Exception as vol_err:
                         logger.warning(f"Could not apply volume boost: {vol_err}")
 
-            # --- OUTPUT ---
             output_dir = os.path.dirname(video_path).replace("temp_videos", "output_videos")
             os.makedirs(output_dir, exist_ok=True)
             
