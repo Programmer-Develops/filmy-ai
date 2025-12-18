@@ -63,7 +63,7 @@ env/
 # Data
 data/
 logs/
-models/
+# models/
 
 # Testing
 .pytest_cache/
