@@ -1,5 +1,4 @@
-# 🎬 Filmy-AI: The AI-Powered Video Editor API
-
+# 🎬 Filmy-AI: An AI Agent for Video Editing
 > **Automate your video editing workflow with the power of Generative AI and Python.**
 
 ---
