@@ -4,15 +4,25 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks,
 from fastapi.responses import FileResponse
 import os
 import asyncio
+import logging
 
 from app.services.video_service import VideoService
 from app.models.schemas import VideoProcessRequest, VideoEnhancementRequest, InstructionRequest
 from app.config import get_settings
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1", tags=["video-operations"])
 
-# Initialize the AI Service
-video_service = VideoService()
+# Lazy initialize the AI Service
+_video_service = None
+
+def get_video_service():
+    """Lazy load VideoService to ensure environment variables are loaded"""
+    global _video_service
+    if _video_service is None:
+        _video_service = VideoService()
+    return _video_service
 
 
 @router.get("/health")
@@ -36,7 +46,7 @@ async def upload_video(file: UploadFile = File(...)):
             pass
 
         settings = get_settings()
-        file_path = await video_service.save_upload(file, settings.temp_video_dir)
+        file_path = await get_video_service().save_upload(file, settings.temp_video_dir)
         video_id = os.path.basename(file_path)
 
         return {
@@ -46,6 +56,7 @@ async def upload_video(file: UploadFile = File(...)):
             "filename": video_id 
         }
     except Exception as e:
+        logger.exception("Error in upload_video:")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -64,7 +75,7 @@ async def instruct(request: InstructionRequest):
 
         # Call the new AI-driven method in video_service
         # This will block until processing is done (good for demo, use BackgroundTasks for production)
-        result = await video_service.edit_video_by_instruction(video_path, request.instruction)
+        result = await get_video_service().edit_video_by_instruction(video_path, request.instruction)
         
         if result.get("status") == "error":
             raise HTTPException(status_code=500, detail=result.get("message"))
@@ -102,7 +113,7 @@ async def enhance_video(request: VideoEnhancementRequest):
         if not os.path.exists(video_path):
             raise HTTPException(status_code=404, detail="Video not found")
 
-        result = await video_service.enhance_video(video_path, request.enhancement_type, request.settings)
+        result = await get_video_service().enhance_video(video_path, request.enhancement_type, request.settings)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

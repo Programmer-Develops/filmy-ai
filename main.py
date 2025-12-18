@@ -1,10 +1,18 @@
 """Main application entry point"""
 
+# Load environment variables from .env FIRST, before any other imports
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file from the current directory
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path, override=True)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-import os
 
 from app.config import get_settings
 from app.api.routes import router
