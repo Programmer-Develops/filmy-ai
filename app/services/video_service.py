@@ -151,22 +151,35 @@ class VideoService:
                         img_clip.start = start
                     
                     # Manual Position Handling for ImageClip
+                    # Ensuring `pos` is a callable that returns numeric (x, y) coordinates
+                    def _safe_size(c, default=0):
+                        try:
+                            return getattr(c, 'w', None) or (c.size[0] if hasattr(c, 'size') else default)
+                        except Exception:
+                            return default
+
+                    iw = _safe_size(img_clip, 0)
+                    ih = _safe_size(img_clip, 0)
+
                     if position == "center":
-                        pos = "center"
+                        pos = lambda t: ((clip.w - iw) / 2, (clip.h - ih) / 2)
                     elif position == "top-left":
                         pos = lambda t: (20, 20)
                     elif position == "top-right":
-                        pos = lambda t: (clip.w - img_clip.w - 20, 20) if hasattr(img_clip, 'w') else ("right", "top")
+                        pos = lambda t: (max(0, clip.w - iw - 20), 20)
                     elif position == "bottom-left":
-                        pos = lambda t: (20, clip.h - img_clip.h - 20) if hasattr(img_clip, 'h') else ("left", "bottom")
+                        pos = lambda t: (20, max(0, clip.h - ih - 20))
                     elif position == "bottom-right":
-                        pos = lambda t: (clip.w - img_clip.w - 20, clip.h - img_clip.h - 20) if (hasattr(img_clip, 'w') and hasattr(img_clip, 'h')) else ("right", "bottom")
+                        pos = lambda t: (max(0, clip.w - iw - 20), max(0, clip.h - ih - 20))
                     else:
-                        pos = "center"
+                        # default to center
+                        pos = lambda t: ((clip.w - iw) / 2, (clip.h - ih) / 2)
 
+                    # Prefer the native setter when available (it accepts strings or callables).
                     if hasattr(img_clip, 'set_pos'):
                         img_clip = img_clip.set_pos(pos)
                     else:
+                        # assign a callable that returns numeric tuple to avoid MoviePy attempting to call strings
                         img_clip.pos = pos
                     
                     text_clips.append(img_clip)
@@ -246,14 +259,14 @@ class VideoService:
             output_filename = f"edited_{int(datetime.now().timestamp())}_{video_id}.mp4"
             output_path = os.path.join(output_dir, output_filename)
 
-            clip.write_videofile(output_path, codec="libx264", audio_codec="aac", preset="ultrafast", logger=None)
+            clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
             
             clip.close()
             self.processing_status[video_id] = "completed"
             return {"status": "success", "output_path": output_path, "operations": commands}
 
         except Exception as e:
-            logger.error(f"Editing Failed: {e}")
+            logger.exception("Editing Failed")
             return {"status": "error", "message": str(e)}
 
     async def get_status(self, video_id: str) -> str:
