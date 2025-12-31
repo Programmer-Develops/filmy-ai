@@ -1,6 +1,3 @@
-"""Main application entry point"""
-
-# Load environment variables from .env FIRST, before any other imports
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -54,22 +51,23 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
-# UPDATED: Explicitly define origins to prevent browser blocking
+# --- CORS CONFIGURATION (FIXED) ---
+# When allow_credentials=True, you CANNOT use ["*"]. 
+# You must list the specific origins that need access.
 origins = [
-    "http://127.0.0.1:5500",  # VS Code Live Server
-    "http://localhost:5500",  # Alternative localhost
-    "https://filmy-ai.onrender.com", # Your production domain
-    "*"                       # Wildcard for other dev environments
+    "http://127.0.0.1:5500",      # VS Code Live Server
+    "http://localhost:5500",      # Alternative localhost
+    "https://filmy-ai.onrender.com" # Production domain
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ----------------------------------
 
 # Include routes
 app.include_router(router)
@@ -85,10 +83,12 @@ async def root():
         "docs": "/docs"
     }
 
-# ADDED: Endpoint to silence the Favicon 404 error
+# --- FAVICON FIX ---
+# Returns 204 No Content to silence the browser's 404 error for favicon
 @app.get('/favicon.ico', include_in_schema=False)
 async def favicon():
     return Response(status_code=204)
+# -------------------
 
 @app.get("/api/v1/features")
 async def get_features():
