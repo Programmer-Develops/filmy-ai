@@ -57,7 +57,8 @@ app = FastAPI(
 origins = [
     "http://127.0.0.1:5500",      # VS Code Live Server
     "http://localhost:5500",      # Alternative localhost
-    "https://filmy-ai.onrender.com" # Production domain
+    "https://filmy-ai.onrender.com", # Production domain
+    "*"
 ]
 
 app.add_middleware(
