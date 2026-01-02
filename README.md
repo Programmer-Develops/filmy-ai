@@ -1,7 +1,7 @@
 # 🎬 Filmy-AI: An AI Agent for Video Editing
 
-[![GitHub stars](https://img.shields.io/github/stars/yourusername/filmy-ai?style=social)](https://github.com/yourusername/filmy-ai)
-[![GitHub forks](https://img.shields.io/github/forks/yourusername/filmy-ai?style=social)](https://github.com/yourusername/filmy-ai)
+[![GitHub stars](https://img.shields.io/github/stars/programmer-develops/filmy-ai?style=social)]
+[![GitHub forks](https://img.shields.io/github/forks/programmer-develops/filmy-ai?style=social)]
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-green)](https://fastapi.tiangolo.com/)
