@@ -15,10 +15,19 @@ from app.config import get_settings
 from app.api.routes import router
 from app.utils.logger import setup_logger
 
-# Setup logger
 logger = setup_logger("filmy-ai", level="INFO")
+logging.info(f"🎬 Filmy-AI started - If useful, please star: https://github.com/Programmer-Develops/filmy-ai")
 
-
+FIRST_RUN_FILE = ".first_run"
+if not os.path.exists(FIRST_RUN_FILE):
+    print("\n" + "="*50)
+    print("🎬 Thanks for trying Filmy-AI!")
+    print("⭐ If this helps your project, consider starring:")
+    print("   https://github.com/Programmer-Develops/filmy-ai")
+    print("="*50 + "\n")
+    with open(FIRST_RUN_FILE, 'w') as f:
+        f.write("1")
+        
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
@@ -113,7 +122,6 @@ async def get_features():
         ],
         "supported_formats": settings.supported_formats.split(",")
     }
-
 
 if __name__ == "__main__":
     import uvicorn
