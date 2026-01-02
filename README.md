@@ -21,7 +21,7 @@
 
 ## 🎥 Demo
 
-![Filmy-AI Demo](https://s1.ezgif.com/tmp/ezgif-17bf0e05cb5344dc.gif)
+![Filmy-AI Demo](https://image2url.com/r2/default/gifs/1767359545338-e0e49cbb-c138-4751-b668-640537ac2397.gif)
 
 *See how Filmy-AI processes videos with AI instructions in real-time!*
 
