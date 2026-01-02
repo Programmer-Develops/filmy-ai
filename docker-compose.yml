@@ -5,10 +5,12 @@ services:
     build: .
     container_name: filmy-ai-api
     ports:
-      - "8000:8000"
+      # Maps localhost:7860 to container:7860
+      - "7860:7860"
     environment:
       - API_HOST=0.0.0.0
-      - API_PORT=8000
+      # Internal app config set to 7860
+      - API_PORT=7860
       - DEBUG=False
       - ENVIRONMENT=production
       - DATABASE_URL=sqlite:///./data/filmy_ai.db
