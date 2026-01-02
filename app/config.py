@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     supported_formats: str = "mp4,avi,mov,mkv,flv"
     temp_video_dir: str = "./data/temp_videos"
     output_video_dir: str = "./data/output_videos"
+    
+    # Video Encoding (Memory Optimization)
+    video_preset: str = "medium"  # ultrafast, superfast, veryfast, faster, fast, medium, slow, slower
+    video_bitrate: str = "2000k"  # Lower bitrate = less RAM usage (e.g., "1500k", "2000k", "3000k")
+    video_crf: int = 28  # Quality (0-51, default 23: lower=better, higher=faster/smaller)
+    audio_chunk_duration: float = 5.0  # Process audio in chunks (seconds) to reduce RAM
 
     # Database
     database_url: str = "sqlite:///./data/filmy_ai.db"

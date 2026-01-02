@@ -16,6 +16,15 @@
 
 **Try Filmy-AI right now**:
 - 🚀 **Hosted API**: https://shantanu-pandya-filmy-ai-api.hf.space/
+
+---
+
+## 🎥 Demo
+
+![Filmy-AI Demo](https://s1.ezgif.com/tmp/ezgif-17bf0e05cb5344dc.gif)
+
+*See how Filmy-AI processes videos with AI instructions in real-time!*
+
 ---
 
 ## 📋 Table of Contents

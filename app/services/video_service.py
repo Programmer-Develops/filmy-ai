@@ -75,19 +75,42 @@ class VideoService:
             return {}
 
     def _remove_audio_noise(self, audio_clip):
+        """Remove audio noise with reduced memory footprint using streaming/chunking"""
         try:
             if not audio_clip: return None
             rate = int(getattr(audio_clip, "fps", 44100))
-            audio_array = audio_clip.to_soundarray(fps=rate)
+            settings = get_settings()
+            chunk_duration = settings.audio_chunk_duration  # Configurable chunk size
             
-            if audio_array.ndim > 1:
-                data = audio_array.T 
-                reduced = nr.reduce_noise(y=data, sr=rate, stationary=True)
-                clean = reduced.T 
-            else:
-                clean = nr.reduce_noise(y=audio_array, sr=rate, stationary=True)
+            duration = audio_clip.duration
+            num_chunks = int(np.ceil(duration / chunk_duration))
             
-            return AudioArrayClip(clean, fps=rate)
+            cleaned_chunks = []
+            
+            for i in range(num_chunks):
+                start_time = i * chunk_duration
+                end_time = min((i + 1) * chunk_duration, duration)
+                
+                # Extract only this chunk
+                chunk_clip = audio_clip.subclipped(start_time, end_time) if hasattr(audio_clip, 'subclipped') else audio_clip.subclip(start_time, end_time)
+                audio_array = chunk_clip.to_soundarray(fps=rate)
+                
+                # Reduce noise on chunk
+                if audio_array.ndim > 1:
+                    data = audio_array.T 
+                    reduced = nr.reduce_noise(y=data, sr=rate, stationary=True)
+                    clean = reduced.T 
+                else:
+                    clean = nr.reduce_noise(y=audio_array, sr=rate, stationary=True)
+                
+                cleaned_chunks.append(clean)
+                
+                # Free memory after processing chunk
+                del audio_array, chunk_clip
+            
+            # Concatenate cleaned chunks
+            full_clean = np.concatenate(cleaned_chunks, axis=0)
+            return AudioArrayClip(full_clean, fps=rate)
         except Exception as e:
             logger.error(f"Noise reduction error: {e}")
             return audio_clip
@@ -259,7 +282,16 @@ class VideoService:
             output_filename = f"edited_{int(datetime.now().timestamp())}_{video_id}.mp4"
             output_path = os.path.join(output_dir, output_filename)
 
-            clip.write_videofile(output_path, codec="libx264", audio_codec="aac")
+            # Optimize for low RAM usage: use lower bitrate, preset, and ffmpeg parameters
+            settings = get_settings()
+            clip.write_videofile(
+                output_path, 
+                codec="libx264",
+                audio_codec="aac",
+                preset=settings.video_preset,  # faster encoding, less RAM
+                bitrate=settings.video_bitrate,  # Reduce bitrate to lower RAM usage
+                ffmpeg_params=["-crf", str(settings.video_crf)]  # Quality setting
+            )
             
             clip.close()
             self.processing_status[video_id] = "completed"
